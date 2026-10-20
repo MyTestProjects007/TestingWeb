@@ -650,3 +650,9 @@ No actual provider ticket response has been supplied. The account-visible cPanel
 - **Current public recheck:** 2026-10-20 08:52 +06: storefront `/healthz` 200, admin `/` 403, admin `/admin` 404, API `/healthz` and `/api/v1/healthz` timed out as HTTP 000. No host change or deployment followed.
 - **GitHub target:** user-directed target `MyTestProjects007/TestingWeb`, branch `feature/admin-v2`, remote `2` resolves to tip `798e7227e907edbbd262e8fe25b78d9e79cd7247`, which is an ancestor of current local HEAD `ae67305f08051e88b4fcfb2cd1b716df6a968636`. No commit or push had occurred at the time of this check. The anomalous untracked root entries named `ktop Installer.exe…` and `tatus --short` are excluded from release staging.
 - **Release remains blocked:** provider-supported routing/recovery, protected JWT rotation, production PostgreSQL identity/grants, isolated staging, durable uploads, backup/restore, and owner approval are unverified. **PRODUCTION NO-GO — NOT DEPLOYED.**
+
+### GitHub publication and CI — 2026-10-20 09:00 +06
+
+- Reviewed release files were committed as `c02daad391458ce691243e4352c005acca161097` and pushed by normal fast-forward to `MyTestProjects007/TestingWeb`, branch `feature/admin-v2`. `git ls-remote` confirmed the remote ref at this commit.
+- GitHub Actions run [39361942295](https://github.com/MyTestProjects007/TestingWeb/actions/runs/39361942295) completed successfully, including tests, CSS build, dependency audit, Compose/Caddy validation, and production image build. The audit reported 0 vulnerabilities. The separate local targeted preflight test result is 8/8, 0 failed, 0 skipped.
+- No production upload, restart, or route change occurred. Storefront health remains 200; admin `/` 403 and `/admin` 404; API health HTTP 000 timeouts at the latest bounded probe. Remaining security, database identity, staging, persistence, recovery, and provider routing gates keep production **NO-GO**.
