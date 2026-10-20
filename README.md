@@ -53,6 +53,8 @@ Production uses separate `shopademia.store`, `admin.shopademia.store`, and `api.
 
 The server creates the order tables, admin credential table, and indexes at startup. The PostgreSQL Docker volume persists when the app restarts. Back up the database and product-image volumes for disaster recovery. `npm run build:css` regenerates the checked-in production stylesheet when frontend styles change.
 
+Build the production deployment bundle with `npm run package:deployment`. It contains the production/staging Compose files, Caddy configuration, Docker build inputs, database initialization files, and application runtime files; the generated manifest verifies every included file. It excludes environment files, credentials, uploads, `.git`, and `node_modules`. Building the bundle does not deploy or restart the service.
+
 ### Browser tests
 
 For the local read-only preview, set `PLAYWRIGHT_BASE_URL` to its loopback URL and run `npm run test:e2e`; this runs only public storefront browsing checks in Chromium. `npm run test:e2e:all` includes admin UI scenarios and all configured browser engines. Admin specs fail during discovery unless `PLAYWRIGHT_ALLOW_PRIVILEGED_E2E=1` is explicitly set and the target guard validates a non-loopback HTTPS staging hostname, exact `PLAYWRIGHT_STAGING_HOST`, staging environment, and external per-run artifact paths. Use it only against an independently approved disposable staging target with synthetic accounts; it requires the matching Playwright browsers. The target guard rejects the production hostname. Do not run privileged or full suites against the read-only preview or any production service.

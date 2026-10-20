@@ -10,6 +10,7 @@ COPY admin-assets ./admin-assets
 COPY css ./css
 COPY js ./js
 COPY public-assets ./public-assets
+COPY service-worker.js ./
 COPY server ./server
 COPY 404.html admin.html admin-platform.html index.html ./
 RUN mkdir -p /app/uploads && chown node:node /app/uploads

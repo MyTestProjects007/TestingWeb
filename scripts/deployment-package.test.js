@@ -18,21 +18,26 @@ async function writeFixtureFile(root, path, contents = `fixture:${path}\n`) {
 
 async function makeFixture(root) {
     for (const path of [
+        '.dockerignore',
         '404.html',
+        'Caddyfile',
+        'Dockerfile',
         'admin.html',
         'admin-platform.html',
+        'docker-compose.production.yml',
+        'docker-compose.staging.yml',
         'index.html',
         'service-worker.js',
         'package.json',
         'package-lock.json',
         'deployment/cpanel.env.example',
         'docs/CPANEL-DEPLOYMENT-RUNBOOK.md',
-        'scripts/deployment-package.js',
-        'scripts/staging-preflight.js',
         'admin-assets/admin.js',
         'css/styles.css',
         'js/data/products.data.js',
         'public-assets/favicon.svg',
+        'database/Dockerfile',
+        'database/init/10-app-role.sh',
         'server/index.js',
         'server/app.js',
         'server/migrate.js',
@@ -42,6 +47,7 @@ async function makeFixture(root) {
     }
     await writeFixtureFile(root, 'server/index.js', "import './app.js';\n");
     await writeFixtureFile(root, 'server/migrate.js', "import './migrations.js';\n");
+    await writeFixtureFile(root, 'Dockerfile', 'COPY service-worker.js ./\n');
     await writeFixtureFile(root, 'package.json', JSON.stringify({ engines: { node: '>=20' } }));
     await writeFixtureFile(root, 'package-lock.json', JSON.stringify({ lockfileVersion: 3 }));
 }
@@ -74,13 +80,28 @@ test('deployment package is deterministic, manifest-verified, and excludes non-a
         assert.equal(first.packageSha256, second.packageSha256);
         assert.equal(first.path, second.path);
         assert.equal((await verifyDeploymentPackage(first.path)).packageSha256, first.packageSha256);
+        assert.match(first.path, /shopademia-production-/);
 
         const manifest = JSON.parse(await readFile(join(first.path, 'MANIFEST.json'), 'utf8'));
         const packagedPaths = manifest.files.map(({ path }) => path);
+        for (const requiredPath of [
+            'Caddyfile',
+            'Dockerfile',
+            'docker-compose.production.yml',
+            'docker-compose.staging.yml',
+            'database/Dockerfile',
+            'database/init/10-app-role.sh',
+            'service-worker.js',
+            'package-lock.json',
+            'server/app.js',
+            'js/data/products.data.js'
+        ]) {
+            assert.ok(packagedPaths.includes(requiredPath), `Expected production input ${requiredPath}`);
+        }
+        assert.match(await readFile(resolve(repositoryRoot, 'Dockerfile'), 'utf8'), /^COPY service-worker\.js \.\/$/m);
         assert.ok(packagedPaths.includes('package-lock.json'));
-        assert.ok(packagedPaths.includes('server/app.js'));
-        assert.ok(packagedPaths.includes('js/data/products.data.js'));
-        assert.ok(packagedPaths.includes('deployment/cpanel.env.example'));
+        assert.ok(!packagedPaths.includes('deployment/cpanel.env.example'));
+        assert.ok(!packagedPaths.includes('docs/CPANEL-DEPLOYMENT-RUNBOOK.md'));
         assert.ok(!packagedPaths.some((path) => /(?:^|\/)(?:\.env|node_modules|uploads|backups)(?:\/|$)/i.test(path)));
         assert.ok(!packagedPaths.some((path) => /\.(?:test|spec)\.[cm]?js$/i.test(path)));
         assert.ok(!packagedPaths.some((path) => /(?:dump|sqlite|\.db|\.zip|\.age)$/i.test(path)));
@@ -104,22 +125,6 @@ test('deployment package rejects sensitive files nested in packaged asset trees'
         await rm(root, { recursive: true, force: true });
         await rm(outputRoot, { recursive: true, force: true });
     }
-});
-
-test('cPanel environment template contains no credential values', async () => {
-    const template = await readFile(resolve(repositoryRoot, 'deployment/cpanel.env.example'), 'utf8');
-    for (const name of [
-        'PUBLIC_SITE_URL',
-        'ADMIN_SITE_URL',
-        'DATABASE_URL',
-        'DATABASE_SSL',
-        'JWT_SECRET',
-        'MFA_ENCRYPTION_KEY',
-        'UPLOADS_DIR'
-    ]) {
-        assert.match(template, new RegExp(`^${name}=$`, 'm'));
-    }
-    assert.doesNotMatch(template, /(?:password|secret|token)=\S+/i);
 });
 
 test('deployment package verifier detects tampering and extra files', async () => {

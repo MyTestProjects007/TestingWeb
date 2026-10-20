@@ -15,19 +15,21 @@ import { fileURLToPath } from 'node:url';
 
 const repositoryRoot = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const rootFiles = [
+    '.dockerignore',
     '404.html',
+    'Caddyfile',
+    'Dockerfile',
     'admin.html',
     'admin-platform.html',
+    'docker-compose.production.yml',
+    'docker-compose.staging.yml',
     'index.html',
     'package.json',
     'package-lock.json',
-    'service-worker.js',
-    'deployment/cpanel.env.example',
-    'docs/CPANEL-DEPLOYMENT-RUNBOOK.md',
-    'scripts/deployment-package.js',
-    'scripts/staging-preflight.js'
+    'service-worker.js'
 ];
 const staticDirectories = ['admin-assets', 'css', 'js', 'public-assets'];
+const deploymentDirectories = ['database'];
 const entryPoints = ['server/index.js', 'server/migrate.js'];
 const manifestName = 'MANIFEST.json';
 const forbiddenPath = /(?:^|\/)(?:\.env(?:\..*)?|\.git|node_modules|uploads|backups|coverage|test-results|playwright-report)(?:\/|$)|(?:^|\/)(?:credentials?|secrets?)(?:\.[^/]*)?$|\.(?:pem|key|p12|pfx|dump|sqlite|db|zip|tar|gz|age)$/i;
@@ -142,6 +144,7 @@ export async function collectDeploymentFiles(root = repositoryRoot) {
     const files = new Map();
     for (const packagePath of rootFiles) await addFile(files, sourceRoot, packagePath);
     for (const directory of staticDirectories) await addDirectory(files, sourceRoot, directory);
+    for (const directory of deploymentDirectories) await addDirectory(files, sourceRoot, directory);
     await addRuntimeGraph(files, sourceRoot);
     return [...files.entries()]
         .map(([path, sourcePath]) => ({ path, sourcePath }))
@@ -230,7 +233,7 @@ export async function buildDeploymentPackage({
         manifestEntries.push({ path: file.path, size: contents.byteLength, sha256: sha256(contents) });
     }
     const manifest = createManifest(manifestEntries);
-    const targetDirectory = join(outputDirectory, `shopademia-cpanel-${manifest.packageSha256.slice(0, 16)}`);
+    const targetDirectory = join(outputDirectory, `shopademia-production-${manifest.packageSha256.slice(0, 16)}`);
 
     try {
         const existing = await lstat(targetDirectory);
