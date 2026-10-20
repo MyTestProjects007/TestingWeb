@@ -9,3 +9,4 @@ uploads/
 npm-debug.log*
 playwright-report/
 test-results/
+release-artifacts/

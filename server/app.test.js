@@ -3889,6 +3889,9 @@ test('read-only preview rejects privileged and write routes before handlers whil
         if (!/^\s*(SELECT|WITH)\b/i.test(sql)) {
             throw new Error('Unexpected database write in read-only preview test.');
         }
+        if (sql === "SELECT id, slug FROM shops WHERE status = 'active'") {
+            return { rows: [{ id: '00000000-0000-4000-8000-000000000001', slug: 'main' }] };
+        }
         return query(sql, values);
     };
     const app = createApp({ pool, config: { ...config, readOnlyPreview: true } });
@@ -3918,6 +3921,8 @@ test('read-only preview rejects privileged and write routes before handlers whil
         '/api/v1/admin/orders',
         '/api/v1/shops/main/push-key',
         '/api/v1/shops/main/push-key?route=/api/v1/products',
+        '/top-selling',
+        '/api/v1/top-selling',
         '/find-order',
         '/find-order?route=/api/v1/products',
         '/%66ind-order'
@@ -3927,13 +3932,21 @@ test('read-only preview rejects privileged and write routes before handlers whil
     await request(app).head('/api/v1/admin/dashboard').expect(404);
     await request(app).head('/api/v1/orders').expect(404);
     await request(app).head('/api/v1/customer/order-lookup').expect(404);
+    await request(app).head('/top-selling').expect(404);
+    await request(app).head('/api/v1/top-selling').expect(404);
     assert.equal(statements.length, queryCountBeforePrivilegedReads);
     await request(app).get('/api/v1/products?route=/api/v1/admin/dashboard').expect(200);
     await request(app).get('/api/v1/products').expect(200);
     await request(app).head('/api/v1/products').expect(200);
+    const beforePreviewAnnouncement = statements.length;
+    await request(app).get('/api/v1/storefront-announcement')
+        .expect(200, { data: { text: 'Discover products from independent shops' } });
+    assert.equal(statements.length, beforePreviewAnnouncement);
     const storefront = await request(app).get('/').expect(200).expect('Content-Type', /html/);
     assert.match(storefront.text, /Local read-only preview: browsing is enabled/);
     assert.match(storefront.text, /checkout, order lookup, notifications, and administration are disabled/);
+    const sitemap = await request(app).get('/sitemap.xml').expect(200);
+    assert.doesNotMatch(sitemap.text, /\/top-selling</);
     await request(app).get('/css/styles.css').expect(200).expect('Content-Type', /css/);
     await request(app).get('/js/main.js').expect(200).expect('Content-Type', /javascript/);
     await request(app).get('/public-assets/shopademia-mark.svg').expect(200).expect('Content-Type', /svg/);

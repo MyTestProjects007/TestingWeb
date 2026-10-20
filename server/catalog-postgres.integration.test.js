@@ -10,15 +10,66 @@ const enabled = process.env.SHOPADEMIA_CATALOG_PG_TEST === '1';
 const databaseUrl = process.env.SHOPADEMIA_CATALOG_PG_DATABASE_URL;
 const expectedDatabase = process.env.SHOPADEMIA_CATALOG_PG_DATABASE;
 const expectedRole = process.env.SHOPADEMIA_CATALOG_PG_ROLE;
+const isolatedDatabase = 'shopademia_catalog_consistency_test';
+const isolatedRole = 'shopademia_catalog_test_role';
 const shopId = '00000000-0000-4000-8000-000000000001';
 
-test('PostgreSQL checkout reads current product state and prevents concurrent oversell', { skip: !enabled }, async (t) => {
-    assert.ok(databaseUrl && expectedDatabase && expectedRole,
-        'Explicit isolated PostgreSQL URL, database name, and role are required.');
+function assertCatalogIntegrationTarget(databaseUrl) {
     const parsedUrl = new URL(databaseUrl);
     assert.ok(['postgres:', 'postgresql:'].includes(parsedUrl.protocol));
     assert.equal(parsedUrl.hostname, '127.0.0.1',
         'Catalog PostgreSQL integration tests require a loopback database.');
+    assert.equal(parsedUrl.port, '55442',
+        'Catalog PostgreSQL integration tests require the isolated test port 55442.');
+    assert.equal(decodeURIComponent(parsedUrl.username), isolatedRole,
+        'Catalog PostgreSQL integration tests require the dedicated test role.');
+    assert.equal(parsedUrl.pathname, `/${isolatedDatabase}`,
+        'Catalog PostgreSQL integration tests require the marked test database.');
+    assert.equal(parsedUrl.search, '',
+        'Catalog PostgreSQL integration tests do not allow connection-string query overrides.');
+    assert.equal(parsedUrl.hash, '',
+        'Catalog PostgreSQL integration tests do not allow connection-string fragments.');
+    return parsedUrl;
+}
+
+test('PostgreSQL integration target rejects the unknown local database port', () => {
+    assert.doesNotThrow(() => assertCatalogIntegrationTarget(
+        `postgresql://${isolatedRole}:unused@127.0.0.1:55442/${isolatedDatabase}`
+    ));
+    assert.throws(() => assertCatalogIntegrationTarget(
+        `postgresql://${isolatedRole}:unused@127.0.0.1:5432/${isolatedDatabase}`
+    ), /isolated test port 55442/);
+    for (const host of ['localhost', '192.0.2.1', 'database.example.com']) {
+        assert.throws(() => assertCatalogIntegrationTarget(
+            `postgresql://${isolatedRole}:unused@${host}:55442/${isolatedDatabase}`
+        ), /require a loopback database/);
+    }
+    assert.throws(() => assertCatalogIntegrationTarget(
+        `postgresql://other-role:unused@127.0.0.1:55442/${isolatedDatabase}`
+    ), /require the dedicated test role/);
+    assert.throws(() => assertCatalogIntegrationTarget(
+        `postgresql://${isolatedRole}:unused@127.0.0.1:55442/other-database`
+    ), /require the marked test database/);
+    for (const override of [
+        '?host=database.example.com',
+        '?hostaddr=192.0.2.10',
+        '?options=-c%20default_transaction_read_only%3Doff',
+        '#other-database'
+    ]) {
+        assert.throws(() => assertCatalogIntegrationTarget(
+            `postgresql://${isolatedRole}:unused@127.0.0.1:55442/${isolatedDatabase}${override}`
+        ), /do not allow connection-string (query overrides|fragments)/);
+    }
+});
+
+test('PostgreSQL checkout reads current product state and prevents concurrent oversell', { skip: !enabled }, async (t) => {
+    assert.ok(databaseUrl && expectedDatabase && expectedRole,
+        'Explicit isolated PostgreSQL URL, database name, and role are required.');
+    assert.equal(expectedDatabase, isolatedDatabase,
+        'Catalog PostgreSQL integration tests require the marked integration database.');
+    assert.equal(expectedRole, isolatedRole,
+        'Catalog PostgreSQL integration tests require the dedicated non-privileged role.');
+    assertCatalogIntegrationTarget(databaseUrl);
 
     const pool = new Pool({ connectionString: databaseUrl, max: 6 });
     const previousProducts = getManagedProducts();

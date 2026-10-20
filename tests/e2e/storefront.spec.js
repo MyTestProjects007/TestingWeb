@@ -655,10 +655,9 @@ test('product detail route and metadata render for an available catalog item', a
     await page.getByRole('button', { name: 'Remove from wishlist' }).click();
     await expect(page.getByRole('button', { name: 'Save to wishlist' })).toHaveAttribute('aria-pressed', 'false');
     await expect(page).toHaveTitle(`${product.seoTitle?.trim() || product.name} | ${product.shopName} | Shopademia`);
-    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
-        'href',
-        new RegExp(`/product/${encodeURIComponent(product.id)}\\?shop=${encodeURIComponent(product.shopSlug)}$`)
-    );
+    const canonicalProductUrl = new URL(`/product/${encodeURIComponent(product.id)}`, expectedSiteOrigin);
+    if (product.shopSlug !== 'main') canonicalProductUrl.searchParams.set('shop', product.shopSlug);
+    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', canonicalProductUrl.toString());
     const structuredData = JSON.parse(await page.locator('script[type="application/ld+json"]').textContent());
     expect(structuredData['@graph'].some(({ '@type': type }) => type === 'Product')).toBe(true);
     expect(structuredData['@graph'].some(({ '@type': type }) => type === 'BreadcrumbList')).toBe(true);

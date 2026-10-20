@@ -905,7 +905,16 @@ export function createApp({ pool, config }) {
             const { rows } = await pool.query("SELECT id, slug FROM shops WHERE status = 'active'");
             const slugByShopId = new Map(rows.map(({ id, slug }) => [id, slug]));
             const shopSlugs = rows.map(({ slug }) => slug);
-            const urls = new Set(['/', '/shops', '/top-selling', '/deals', '/about', '/find-order', '/privacy', '/terms']);
+            const urls = new Set([
+                '/',
+                '/shops',
+                ...(config.readOnlyPreview ? [] : ['/top-selling']),
+                '/deals',
+                '/about',
+                '/find-order',
+                '/privacy',
+                '/terms'
+            ]);
             for (const slug of shopSlugs) {
                 urls.add(`/shops/${encodeURIComponent(slug)}`);
                 if (slug !== 'main') urls.add(`/?shop=${encodeURIComponent(slug)}`);
@@ -1366,6 +1375,9 @@ export function createApp({ pool, config }) {
     });
     app.get('/api/v1/storefront-announcement', publicCatalogLimit, async (_req, res, next) => {
         res.set('Cache-Control', 'no-store');
+        if (config.readOnlyPreview) {
+            return res.json({ data: { text: DEFAULT_STOREFRONT_ANNOUNCEMENT } });
+        }
         try {
             const { rows } = await pool.query(
                 `SELECT value, is_secret AS "isSecret"
